@@ -1,0 +1,43 @@
+// Change the base map to remove country borders
+Map.setOptions('SATELLITE'); 
+
+// Load and Filter Administrative Boundaries to Only Show Sylhet
+var admin = ee.FeatureCollection("FAO/GAUL_SIMPLIFIED_500m/2015/level1");
+var Sylhet = admin.filter(ee.Filter.eq('ADM1_NAME', 'Sylhet')); 
+
+// Display ONLY Sylhet as an outline (No Country Boundaries)
+Map.addLayer(Sylhet.style({color: 'black', width: 2, fillColor: '00000000'}), {}, 'Sylhet District Outline');
+Map.centerObject(Sylhet, 10);
+
+// Define Square Grid Areas for Belagaon, Bangladesh with Different Colors
+var belagaonPoints = [
+  {point: ee.Geometry.Point([91.9444, 24.7038]), color: 'blue'},      // Square 1
+  {point: ee.Geometry.Point([92.0447024671648, 24.545699216951935]), color: 'red'},  // Square 2
+  {point: ee.Geometry.Point([92.07634063577363, 24.76681186444096]), color: 'purple'} // Square 3
+];
+
+belagaonPoints.forEach(function(item, index) {
+  var center = item.point;
+  var size = 0.045; // Approx. 5 km in degrees (adjust if needed)
+
+  // Compute square corner coordinates manually
+  var lon = ee.Number(center.coordinates().get(0));
+  var lat = ee.Number(center.coordinates().get(1));
+
+  var coords = ee.List([
+    ee.List([lon.add(size), lat.add(size)]),  // Top-right
+    ee.List([lon.subtract(size), lat.add(size)]),  // Top-left
+    ee.List([lon.subtract(size), lat.subtract(size)]),  // Bottom-left
+    ee.List([lon.add(size), lat.subtract(size)]),  // Bottom-right
+    ee.List([lon.add(size), lat.add(size)])   // Closing the loop
+  ]);
+
+  // Create the outer perimeter of the square as a Polygon
+  var squarePerimeter = ee.Geometry.Polygon(coords);
+
+  // Convert to FeatureCollection and Add to Map
+  var squareFeature = ee.FeatureCollection([ee.Feature(squarePerimeter)]);
+  
+  // Increase thickness of the outline by setting `width: 4`
+  Map.addLayer(squareFeature.style({color: item.color, width: 4, fillColor: '00000000'}), {}, 'Belagaon Square ' + (index + 1));
+});
