@@ -1,0 +1,68 @@
+// All Satellite Data is stored as discrete pixels, and that means it can be reffered as categorical, Right?
+// No, The quantitative variables will have to be determined for each dataset to determine which lines of code to use 
+// This is crucial because for the coding language GEE uses, the same code that works for one satellite data like (landsat) and (Global ALot mTPI) will not work.
+// So .sampleregion is used for continuous dataset and .Reduceregion is used for Discrete dataset.
+
+// * Now classify if your dataset is static or dynamic; if static you will only need to download it once because the values are fixed independently of time*
+// * This dataset was created in 2020 which isn't alot of time compared to 2024/2025 (landuse wise), therefore, i assumed it to be constant)*
+// * in contrast, Dynamic will change with time therefore the time will need to be recorded in the CSV file *
+
+// ** There should be other CSV files and not all into one because it's not just easier to detect error but also **
+// ** Conserve information as GEE will resample using nearest-neighbor interpolation which is the opposite of untampered data** 
+
+// Load CSV file from GEE Assets (Replace with your actual asset path --> Assets --> download asset (csv) --> click on asset to copy directory // Or you can just import it
+var csvFile = ee.FeatureCollection("projects/rd-year-research-project/assets/GEE_Event_01c_Bangladesh_2");
+
+// Load ESA WorldCover dataset -> you can do it like this or import it.
+// Theres only one image in this "imagecollection"
+var Dataset = ee.Image("MERIT/DEM/v1_0_3")
+// You can go to dataset catalog to see the bands (what information is stored in the dataset). In this case it was Map
+var Value = Dataset.select('dem');
+// This is just a general visualisation 
+Map.addLayer(Dataset, {bands: ['dem']}, 'Elevation', false);
+
+// Convert CSV rows into points
+var points = csvFile.map(function(feature) {
+  var lat = ee.Number(feature.get('Latitude'));
+  var lon = ee.Number(feature.get('Longitude'));
+  var pointGeom = ee.Geometry.Point([lon, lat]);
+  
+  // Return a new Feature with the original properties + any other information not directly specified e.g. system Index
+  return ee.Feature(pointGeom, feature.toDictionary());
+});
+
+// Sample the image at each location (no interpolation)
+var Value = Dataset.sampleRegions({
+  collection: points,
+  scale: 92.77,  // Match dataset pixel size
+  geometries: true  // Keep lat/lon in the output
+});
+
+// Print number of points and a sample with land cover values
+print("Total Number of Data Points:", Value.size());
+print("Sample Data Points with Land Cover:", Value.limit(2));
+
+// Export updated points with land cover to CSV
+Export.table.toDrive({
+  collection: Value,
+  description: "Bangladesh_Event1c_Elevation_3",
+  folder: "EngineNew",
+  fileFormat: "CSV",
+  selectors: ["Latitude", "Longitude", "dem"]
+});
+
+// Convert CSV rows into point geometries
+var points = csvFile.map(function(feature) {
+  var lat = ee.Number(feature.get('Latitude'));
+  var lon = ee.Number(feature.get('Longitude'));
+  var pointGeom = ee.Geometry.Point([lon, lat]);
+
+  return ee.Feature(pointGeom).set({
+    'Latitude': lat,
+    'Longitude': lon
+  });
+});
+
+// Visualize points on the map (ensure they are properly displayed)
+Map.addLayer(points, {color: 'red'}, "CSV Points"), false;
+Map.centerObject(points, 8);
