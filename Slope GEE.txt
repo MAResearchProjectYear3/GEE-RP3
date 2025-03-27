@@ -1,0 +1,53 @@
+// Load the ALOS mTPI dataset
+var dataset = ee.Image('CSP/ERGo/1_0/Global/ALOS_mTPI');
+var alosMtpi = dataset.select('AVE');  // Selecting the 'AVE' band
+
+// Load CSV file from Assets
+var csvFile = ee.FeatureCollection('projects/rd-year-research-project/assets/GEE_Event_01a_Bangladesh_1');
+
+// Convert CSV rows into points
+var points = csvFile.map(function(feature) {
+  var lat = ee.Number(feature.get('Latitude'));
+  var lon = ee.Number(feature.get('Longitude'));
+  var pointGeom = ee.Geometry.Point([lon, lat]);
+  
+  // Return a new Feature with the original properties + geometry
+  return ee.Feature(pointGeom, feature.toDictionary());
+});
+
+// Sample the image at each location (no interpolation)
+var sampled = alosMtpi.sampleRegions({
+  collection: points,
+  scale: 270,  // Match dataset pixel size
+  geometries: true  // Keep lat/lon in the output
+});
+
+// Export the sampled data to Google Drive as a CSV
+Export.table.toDrive({
+  collection: sampled,
+  description: "Bangladesh_Event1a_Slope_1",
+  folder:'EngineNew',
+  fileFormat: 'CSV',
+  selectors: ["Latitude", "Longitude", "AVE"]
+});
+
+// Add dataset & points to the map for visualization
+Map.centerObject(points, 6);
+Map.addLayer(alosMtpi, {min: -200, max: 200, palette: ['0b1eff', '4be450', 'fffca4', 'ffa011', 'ff0000']}, 'ALOS mTPI');
+Map.addLayer(points, {color: 'red'}, 'Sample Locations', false);
+
+// Convert CSV rows into point geometries
+var points = csvFile.map(function(feature) {
+  var lat = ee.Number(feature.get('Latitude'));
+  var lon = ee.Number(feature.get('Longitude'));
+  var pointGeom = ee.Geometry.Point([lon, lat]);
+
+  return ee.Feature(pointGeom).set({
+    'Latitude': lat,
+    'Longitude': lon
+  });
+});
+
+// Visualize points on the map (ensure they are properly displayed)
+Map.addLayer(points, {color: 'red'}, "CSV Points");
+Map.centerObject(points, 8);

@@ -1,0 +1,83 @@
+// All Satellite Data is stored as discrete pixels, and that means it can be reffered as categorical, Right?
+// No, The quantitative variables will have to be determined for each dataset to determine which lines of code to use 
+// This is crucial because for the coding language GEE uses, the same code that works for one satellite data like (landsat) and (Global ALot mTPI) will not work.
+// So .sampleregion is used for continuous dataset and .Reduceregion is used for Discrete dataset.
+
+// * Now classify if your dataset is static or dynamic; if static you will only need to download it once because the values are fixed independently of time*
+// * This dataset was created in 2020 which isn't alot of time compared to 2024/2025 (landuse wise), therefore, i assumed it to be constant)*
+// * in contrast, Dynamic will change with time therefore the time will need to be recorded in the CSV file *
+
+// ** There should be other CSV files and not all into one because it's not just easier to detect error but also **
+// ** Conserve information as GEE will resample using nearest-neighbor interpolation which is the opposite of untampered data** 
+
+// Define the date ranges for Before, Peak, and Ending periods
+var before_start = '2017-05-01';
+var before_end = '2017-06-01';
+var peak_start = '2017-06-02';
+var peak_end = '2017-09-15';
+var ending_start = '2017-09-16';
+var ending_end = '2017-11-06';
+
+// Load CSV file from GEE Assets (Replace with your actual asset path --> Assets --> download asset (csv) --> click on asset to copy directory // Or you can just import it
+var csvFile = ee.FeatureCollection("projects/rd-year-research-project/assets/GEE_Event_01b_Bangladesh_3");
+
+// Flood database and event selection
+var Dataset = ee.ImageCollection('GLOBAL_FLOOD_DB/MODIS_EVENTS/V1');
+var FloodEventId = 4508;
+// flood from 25/07/2016 to 26/08/2016, Days 42 : ID 4382 Bangladesh 
+// flood from 10/08/2017 to 26/08/2017: ID 4508 Bangladesh 1st event
+// flood from 20/07/2018 to 02/10/2018 :ID 4667 3rd event
+ 
+// convert image collection to single image so we can use sample.region
+var FloodEvent = Dataset.filterMetadata('id', 'equals', FloodEventId).first();
+FloodEvent = ee.Image(FloodEvent);
+
+Map.addLayer(FloodEvent.select('flooded').selfMask(), {min: 0, max: 1, palette: '001133'},'Flooded - Inundation Extent');
+
+
+// Convert CSV rows into points
+var points = csvFile.map(function(feature) {
+  var lat = ee.Number(feature.get('Latitude'));
+  var lon = ee.Number(feature.get('Longitude'));
+  var pointGeom = ee.Geometry.Point([lon, lat]);
+  
+  
+// Return a new Feature with the original properties + any other information not directly specified e.g. system Index
+  return ee.Feature(pointGeom, feature.toDictionary());
+});
+
+// Sample the image at each location (no interpolation)
+var Value = FloodEvent.sampleRegions({
+  collection: points,
+  scale: 250,  // Match dataset pixel size
+  geometries: true  // Keep lat/lon in the output
+});
+
+// Print number of points and a sample with values
+print("Total Number of Data Points:", Value.size());
+print("Sample Data Points:", Value.limit(2));
+
+// Export updated points with land cover to CSV
+Export.table.toDrive({
+  collection: Value,
+  description: "Bangladesh_Event1b_Flooded_3",
+  folder: "EngineNew",
+  fileFormat: "CSV",
+  selectors: ["Latitude", "Longitude", "flooded"]
+});
+
+// Convert CSV rows into point geometries
+var points = csvFile.map(function(feature) {
+  var lat = ee.Number(feature.get('Latitude'));
+  var lon = ee.Number(feature.get('Longitude'));
+  var pointGeom = ee.Geometry.Point([lon, lat]);
+
+  return ee.Feature(pointGeom).set({
+    'Latitude': lat,
+    'Longitude': lon
+  });
+});
+
+// Visualize points on the map (ensure they are properly displayed)
+Map.addLayer(points, {color: 'red'}, "CSV Points");
+Map.centerObject(points, 8);
