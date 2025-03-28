@@ -1,5 +1,5 @@
 # GEE-RP3
 Theres 3 Branches in this GITHUB
-1) GEEcode for Google earth engine codes
-2) Data that were used for this rp3 project
-3) RF code
+1) GEEcode Branch -> GEE. -> GOogle earth engine code that were used.
+2) Master -> Data and python code that were used for processing and analysis
+3) PythonRF -> the code used for random forests
